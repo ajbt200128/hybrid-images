@@ -2,14 +2,25 @@ use image::{io::Reader as ImageReader, DynamicImage, imageops::{filter3x3, self}
 use image::Rgba;
 use imageproc::{filter::{gaussian_blur_f32, sharpen_gaussian}, map::map_colors2};
 
+
+use clap::Parser;
+
+#[derive(Parser,Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args{
+    file_a:String,
+    file_b:String,
+}
+
 const IDENTITY_MINUS_LAPLACIAN: [f32; 9] = [0.0, -1.0, 0.0, -1.0, 5.0, -1.0, 0.0, -1.0, 0.0];
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut img1 = ImageReader::open("images/hybridImages/bear.jpg")?.decode()?;
-    let img2 = ImageReader::open("images/hybridImages/wrighton.jpg")?.decode()?;
+    let args = Args::parse();
+    let mut img1 = ImageReader::open(&args.file_a)?.decode()?;
+    let img2 = ImageReader::open(&args.file_b)?.decode()?;
     // Create a window with default options and display the image.
     let img1 = high_pass(img1);
     img1.save("a.jpg")?;
-    let img2 = low_pass(img2,13.0);
+    let img2 = low_pass(img2,10.0);
     img2.save("b.jpg")?;
     let t = overlay(img1, img2);
     t.save("t.jpg")?;
@@ -38,7 +49,7 @@ fn low_pass(img:DynamicImage,amt:f32) -> DynamicImage{
 
 fn high_pass(img:DynamicImage) -> DynamicImage{
     let img_impulse = filter3x3(&img, &IDENTITY_MINUS_LAPLACIAN);
-    let img_low = low_pass(img,0.6);
+    let img_low = low_pass(img,0.7);
     let diff = map_colors2(&img_impulse,&img_low, |mut p,q|
                            {
                                p.apply2(&q, |c1,c2| {
