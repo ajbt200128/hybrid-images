@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Text { msg1, msg2, msg3 } => {
             let msg3_len = if let Some(msg) = msg3 { msg.len() } else { 0 };
             let len = msg1.len().max(msg2.len()).max(msg3_len);
-            let width = ((500 * len) / 4) as u32;
+            let width = ((400 * len) / 4) as u32;
 
             let img1 = draw_message(
                 msg1.to_string(),
@@ -90,11 +90,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     img1.save("a.jpg")?;
     img2.save("b.jpg")?;
     let t = if let Some(img3) = img3 {
-        let img3 = high_pass(img3, args.c_blur.unwrap_or(0.6));
-        //  let img3 = low_pass(img3, args.b_blur.unwrap_or(0.6));
+        let img3 = high_pass(img3, args.c_blur.unwrap_or(0.0));
         img3.save("c.jpg")?;
-        //let img3 = high_pass(img3, args.c_blur.unwrap_or(0.6));
-        //img2 = overlay(img3, img2);
         overlay3(img1, img2, img3)
     } else {
         overlay(img1, img2)
@@ -114,18 +111,9 @@ fn draw_message(
     let font_data: &[u8] = include_bytes!("/usr/share/fonts/FuturaLT-Bold.ttf");
     let font: Font<'static> = Font::try_from_bytes(font_data).unwrap();
     let canvas: RgbaImage = ImageBuffer::new(width, height);
-    let mut img = DynamicImage::ImageRgba8(canvas.clone());
-    let mut img_outline = DynamicImage::ImageRgba8(canvas);
+    let mut img = DynamicImage::ImageRgba8(canvas);
     draw_text_mut(&mut img, color, x, y, scale, &font, &msg);
-    draw_text_mut(&mut img_outline, color, x, y, scale, &font, &msg);
-    img.save("out0.jpg").unwrap();
-    let img_outline1 = low_pass(img_outline.clone(), 10.0);
-    img_outline1.save("out1.jpg").unwrap();
-    let img_outline2 = high_pass(img_outline, 2.0);
-    img_outline2.save("out2.jpg").unwrap();
-    let comb = overlay3(img_outline1, img_outline2, img);
-    comb.save("out3.jpg").unwrap();
-    comb
+    img
 }
 
 fn clamp_sub(a: u8, b: u8, max: u8) -> u8 {
@@ -156,7 +144,7 @@ fn laplacian(amt:f32) -> [f32;9]{
 
 fn high_pass(img: DynamicImage, amt: f32) -> DynamicImage {
     let img_impulse = filter3x3(&img, &laplacian(amt));
-    let img_low = low_pass(img, amt);
+    let img_low = low_pass(img, amt/2.0);
     let diff = map_colors2(&img_impulse, &img_low, |mut p, q| {
         p.apply2(&q, |c1, c2| clamp_sub(c1, c2, u8::MAX));
         p.0[3] = 255;
