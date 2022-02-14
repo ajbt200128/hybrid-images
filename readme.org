@@ -1,4 +1,156 @@
-| command                                                                                         | file               |
-| cargo run --release -- 8.0 0.8 file images/hybridImages/wrighton.jpg images/hybridImages/bear.jpg | bear-wrighton.jpg  |
-| cargo run --release -- images/hybridImages/wrighton.jpg images/hybridImages/panda.jpg 0.55 5.0    | panda-wrighton.jpg |
-| cargo run --release -- 8.0 10.0 100.0 text ABC DEF GHI                                            | alphabet-3.jpg |
+* Hybrid Images
+** Introduction
+  Hybrid images are images that morph from one object to another depending on
+  the viewing distance. Since high frequencies are more visible from up close
+  than low frequencies, and the opposite is true for far away, that means we can
+  take any two images and combine them, in a way that one will be visible up
+  close, and the other from far away. We will be using the approach described in
+  the SIGGRAPH 2006 [[http://olivalab.mit.edu/publications/OlivaTorralb_Hybrid_Siggraph06.pdf][paper]] by Oliva, Torralba, and Schyns.
+*** Rust
+  Once again we are using Rust, but this time we're using the =image= and
+  =imageproc= libraries, as they are more full featured than =Photon-rs=. Included
+  out of the box with these libraries are ways of applying 3x3 filters using
+  =filter3x3()= and a built in gaussian blur via =gaussian_blur_f32=.
+
+  Finally, we also use the handy =rustfft= library, which provides native fast
+  Fourier transforms.
+*** Text Creation
+    In this project, alongside normal photographs, we will also create text
+    hybrid images of user input. To do so, we create a function that will create
+    a basic text image given a string:
+
+    #+begin_src rust
+      fn draw_message(
+        msg: String,
+        width: u32,
+        height: u32,
+        x: u32,
+        y: u32,
+        scale: Scale,
+        color: image::Rgba<u8>,
+      ) -> DynamicImage {
+          // Load font
+          let font_data: &[u8] = include_bytes!("/usr/share/fonts/FuturaLT-Bold.ttf");
+          let font: Font<'static> = Font::try_from_bytes(font_data).unwrap();
+
+          //Create blank canvas
+          let canvas: RgbaImage = ImageBuffer::new(width, height);
+          let mut img = DynamicImage::ImageRgba8(canvas);
+
+          //Draw text
+          draw_text_mut(&mut img, color, x, y, scale, &font, &msg);
+          img
+      }
+    #+end_src
+
+    So if we call this function and pass in "WELCOME" we will get:
+
+    [[./images/results/welcome_process/bb.jpg]]
+
+    And "GOODBYE":
+
+    [[./images/results/welcome_process/bb.jpg]]
+** Creating Low and High Pass Filters
+*** Low Pass Filter
+    The simplest way to create a low pass filter for an image, is to apply a
+    Gaussian blur, as this will average the photo together, meaning that high
+    frequencies will be either lowered or removed altogether, while low
+    frequencies will persist.
+
+    Luckily, this function is already written for us, so we will wrap it in a
+    simple function, where =img= is the image, and =amt= is standard deviation of
+    the Gaussian filter:
+    
+    #+begin_src rust
+fn low_pass(img: DynamicImage, amt: f32) -> DynamicImage {
+    DynamicImage::ImageRgba8(gaussian_blur_f32(&img.to_rgba8(), amt))
+}
+    #+end_src
+
+    If we apply this to our "GOODBYE" image from before, with a standard
+    deviation of 8, we see we get a blurred image:
+
+    [[./images/results/welcome_process/a.jpg]]
+
+    Why a standard deviation of 8? After some testing, I realized that anything
+    above 8 will result in some letters that aren't legible. For example look at
+    the E at the end of GOODBYE. It's starting to look like a left brace [, and
+    the G almost looks like an O. We could use something less, but the smaller
+    the standard deviation, the less blurred it will look, and that means more
+    higher frequencies.
+
+    Now if we compare the Fourier transforms of the before and after, we see
+    we're successful:
+
+    Before:
+    [[./images/results/fft_welcome/fft_aa.jpg]]
+
+    After Blur:
+    [[./images/results/fft_welcome/fft_a.jpg]]
+
+    We see that in the blurred FFT, the only frequencies remaining are those
+    around the edges, which are the low frequencies. Luckily since this filter
+    was built in, there was not much for me to fiddle with, except to determine
+    the highest amount of blur I could use before the letters weren't legible.
+*** High Pass Filter
+    A high pass filter is a bit trickier, but luckily we can use the
+    recommendation from the SIGGRAPH paper, and create a filter by subtracting
+    the impulse of the image, minus the Gaussian blur. The impulse filter simply
+    exemplifies the bright spots of an image, so high frequencies become higher,
+    and lower frequencies are diminished. As described before, the Gaussian is a
+    low pass filter, so by subtracting it, we are removing the low frequencies.
+
+    It'd also be nice to control the impulse filter, so we have a function
+    called laplacian, that sets the center of the kernel to some amount, meaning
+    we can control how much we want the "impulse" to be:
+    
+#+begin_src rust
+fn laplacian(amt: f32) -> [f32; 9] {
+    let mut v = identity_minus_laplacian;
+    v[4] *= amt;
+    v
+}
+#+end_src
+
+And then our high pass function:
+    
+    #+begin_src rust
+      fn high_pass(img: DynamicImage, amt: f32,amt2:f32) -> DynamicImage {
+          // Create impulse image
+          let img_impulse = filter3x3(&img, &laplacian(amt));
+
+          // Create blurred
+          let img_low = low_pass(img, amt2);
+          // calculate the difference by subtracting one channel from the other
+          // Impulse - Gaussian
+          let diff = map_colors2(&img_impulse, &img_low, |mut p, q| {
+              p.apply2(&q, |c1, c2| clamp_sub(c1, c2, u8::MAX));
+              // Keep alpha at 255
+              p.0[3] = 255;
+              p
+          });
+          DynamicImage::ImageRgba8(diff)
+      }
+    #+end_src
+
+    If we apply it to our goodbye image with 5 as the kernel center and 8.0 as
+    the blur we get:
+    
+    [[./images/results/welcome_process/b.jpg]]
+
+    We see that the edges are now more defined, while the centers of the letters
+    are dimmer. We used 5 as the center, as that's standard, and worked best for
+    letters after some experimentation. If we compare the FFT of both images,
+    we'll see what happened:
+
+    Before:
+    [[./images/results/fft_welcome/fft_bb.jpg]]
+
+    After:
+    [[./images/results/fft_welcome/fft_b.jpg]]
+
+    The difference is less obvious here, but we can see that it seems like the
+    image is more grainy, the corners are dimmer, but the center is slightly
+    brighter, which makes sense, as that means the higher frequencies are now
+    more represented.
+** Overlapping images

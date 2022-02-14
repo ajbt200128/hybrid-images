@@ -90,6 +90,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     create_fft(img1.clone()).save("fft_aa.jpg")?;
     create_fft(img2.clone()).save("fft_bb.jpg")?;
+    img1.save("aa.jpg")?;
+    img2.save("bb.jpg")?;
     let img1 = low_pass(img1, args.a_blur.unwrap_or(4.5));
     let img2 = high_pass(img2, args.b_blur.unwrap_or(0.545),args.a_blur.unwrap_or(4.5));
     img1.save("a.jpg")?;
@@ -98,6 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     create_fft(img1.clone()).save("fft_a.jpg")?;
     create_fft(img2.clone()).save("fft_b.jpg")?;
     let t = if let Some(img3) = img3 {
+        img3.save("cc.jpg")?;
 
         create_fft(img3.clone()).save("fft_cc.jpg")?;
         let img3 = high_pass(img3, args.c_blur.unwrap_or(0.0),args.a_blur.unwrap_or(4.5));
@@ -172,7 +175,7 @@ fn low_pass(img: DynamicImage, amt: f32) -> DynamicImage {
 }
 
 fn laplacian(amt: f32) -> [f32; 9] {
-    let mut v = IDENTITY_MINUS_LAPLACIAN;
+    let mut v = identity_minus_laplacian;
     v[4] *= amt;
     v
 }
