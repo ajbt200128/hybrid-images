@@ -124,6 +124,7 @@ And then our high pass function:
           // calculate the difference by subtracting one channel from the other
           // Impulse - Gaussian
           let diff = map_colors2(&img_impulse, &img_low, |mut p, q| {
+              //Clamp keeps operations in bounds
               p.apply2(&q, |c1, c2| clamp_sub(c1, c2, u8::MAX));
               // Keep alpha at 255
               p.0[3] = 255;
@@ -154,3 +155,106 @@ And then our high pass function:
     brighter, which makes sense, as that means the higher frequencies are now
     more represented.
 ** Overlapping images
+   Next, we must overlay the images on top of each other. On my first approach,
+   I would average the images together. Although this worked, I found that when
+   I simply added them together I'd get more of an effect that I liked. The
+   reason behind it makes sense, when averaged together, we'd essentially get an
+   average of the high and low frequencies, while adding them simply overlayed
+   them. I found that averaging worked well for creating hybrid images that
+   looked like a combination of two images, but adding them together gave more
+   of the distance morphing effect, which I preferred. Our function is
+   relatively simple:
+
+   #+begin_src rust
+     fn overlay(a: DynamicImage, b: DynamicImage) -> DynamicImage {
+         let diff = map_colors2(&a, &b, |mut p, q| {
+             // add both channels together, and clamp it so its <= 255
+             p.apply2(&q, |c1, c2| (clamp_add(c1, c2, u8::MAX)));
+             // Don't touch the alpha channel!
+             p.0[3] = 255;
+             p
+         });
+         DynamicImage::ImageRgba8(diff)
+     }
+   #+end_src
+
+   If we overlay our two images, we should get a morphing image:
+
+   [[./images/results/welcome.jpg]] 
+
+   And we see if we get really close to the screen, we can almost only read
+   "WELCOME", which is good since we're so close. If we're far away, our image
+   tells us goodbye! As if you're far away, the high frequencies prevail, and
+   all we can read is goodbye. Finally, if we look at the FFT of this image, we
+   see it's a combination of the past two (note the bright corners from the
+   GOODBYE FFT and the diamond zigzags from the HELLO FFT):
+
+   [[./images/results/fft_welcome/fft_t.jpg]]
+** Colors
+   Something of note of the previous result is that the colors are red and
+   green, not black and white like most text. This isn't by accident, as in my
+   research for this project I had another thought: red is a higher frequency
+   than green, so maybe if we use red for the close text and another color for
+   the further, it's results should be enhanced:
+
+   Enhanced colors:
+   [[./images/results/good.jpg]]
+
+   And we see that the welcome disappears much quicker, and the goodbye is much
+   more visible. This means that we might be able to get away with blurring the
+   GOODBYE a bit more, meaning when we're closer it should disappear faster:
+
+   [[./images/results/best.jpg]]
+
+   This definitely has the most "motion", or transforms the most out of all
+   we've seen, but the downside is that the GOODBYE makes you feel like you need
+   glasses.
+
+   And finally, we can see the same image but black and white:
+
+   [[./images/results/welcome-bw.jpg]]
+** Three images
+   Finally, I wanted to see if I could combine three images, and the results
+   were somewhat successful. Here is the result without any prompt, see if you
+   can tell what the three phrases are:
+
+   Color:
+   [[./images/results/alphabet3.jpg]]
+
+
+   Black and White:
+   [[./images/results/alphabet3-bw.jpg]]
+
+   Far away it should read 123, closer ABC, and really close should be DEF. I
+   found that three images was trickier, as you had to blur the far away one
+   more, and the closest one had to have the high pass filter run enough that it
+   was a bit dark. It seems to work to me, the main drawback being that the
+   transitions aren't crisp, we can see the 123 easily when at medium distance,
+   and the 123 and ABC while very close, meaning that it's not super clear. The
+   strategy for this was to simply run the high pass filter even higher for the
+   "nearest" image, as a combination of the two didn't work well, being visible
+   no matter what instead of only at a certain time. I still do like the effect
+   that there are three phrases to discover instead of two though. It feels like
+   the third phrase is hidden, unless you look closely, while the other two are
+   obvious.
+
+   Finally, if we look at the FFT of this image, we see we were somewhat successful:
+
+   123 after filter:
+   [[./images/results/fft_abc/fft_a.jpg]]
+   
+   ABC after filter:
+   [[./images/results/fft_abc/fft_c.jpg]]
+   
+   DEF after filter:
+   [[./images/results/fft_abc/fft_b.jpg]]
+
+   Final:
+   [[./images/results/fft_abc/fft_t.jpg]]
+   
+** Other images
+| A                               | B                                  | OUT                                 |
+| [[./images/hybridImages/bear.jpg]]  | [[./images/hybridImages/wrighton.jpg]] | [[./images/results/bear-wrighton.jpg]]  |
+| [[./images/hybridImages/panda.jpg]] | [[./images/hybridImages/wrighton.jpg]] | [[./images/results/panda-wrighton.jpg]] |
+| ABC                             | 123                                | [[./images/results/abc-123.jpg]]        |
+| ABC                             | 123                                | [[./images/results/abc-123-bw.jpg]]     |

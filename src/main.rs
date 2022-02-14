@@ -175,7 +175,7 @@ fn low_pass(img: DynamicImage, amt: f32) -> DynamicImage {
 }
 
 fn laplacian(amt: f32) -> [f32; 9] {
-    let mut v = identity_minus_laplacian;
+    let mut v = IDENTITY_MINUS_LAPLACIAN;
     v[4] *= amt;
     v
 }
