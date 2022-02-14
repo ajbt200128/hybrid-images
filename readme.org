@@ -82,10 +82,12 @@ fn low_pass(img: DynamicImage, amt: f32) -> DynamicImage {
     Now if we compare the Fourier transforms of the before and after, we see
     we're successful:
 
-    Before:
+    *Before*:
+    
     [[./images/results/fft_welcome/fft_aa.jpg]]
 
-    After Blur:
+    *After Blur*:
+    
     [[./images/results/fft_welcome/fft_a.jpg]]
 
     We see that in the blurred FFT, the only frequencies remaining are those
@@ -144,10 +146,12 @@ And then our high pass function:
     letters after some experimentation. If we compare the FFT of both images,
     we'll see what happened:
 
-    Before:
+    *Before*:
+    
     [[./images/results/fft_welcome/fft_bb.jpg]]
 
-    After:
+    *After*:
+    
     [[./images/results/fft_welcome/fft_b.jpg]]
 
     The difference is less obvious here, but we can see that it seems like the
@@ -197,7 +201,8 @@ And then our high pass function:
    than green, so maybe if we use red for the close text and another color for
    the further, it's results should be enhanced:
 
-   Enhanced colors:
+   *Enhanced colors*:
+   
    [[./images/results/good.jpg]]
 
    And we see that the welcome disappears much quicker, and the goodbye is much
@@ -218,11 +223,13 @@ And then our high pass function:
    were somewhat successful. Here is the result without any prompt, see if you
    can tell what the three phrases are:
 
-   Color:
+   *Color*:
+   
    [[./images/results/alphabet3.jpg]]
 
 
-   Black and White:
+   *Black and White*:
+   
    [[./images/results/alphabet3-bw.jpg]]
 
    Far away it should read 123, closer ABC, and really close should be DEF. I
@@ -240,16 +247,20 @@ And then our high pass function:
 
    Finally, if we look at the FFT of this image, we see we were somewhat successful:
 
-   123 after filter:
+   *123 after filter*:
+   
    [[./images/results/fft_abc/fft_a.jpg]]
    
-   ABC after filter:
+   *ABC after filter*:
+   
    [[./images/results/fft_abc/fft_c.jpg]]
    
-   DEF after filter:
+   *DEF after filter*:
+   
    [[./images/results/fft_abc/fft_b.jpg]]
 
-   Final:
+   *Final*:
+   
    [[./images/results/fft_abc/fft_t.jpg]]
    
 ** Other images
