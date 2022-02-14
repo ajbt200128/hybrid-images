@@ -1,3 +1,4 @@
-| command                                                                                      | file              |
-| cargo run --release -- images/hybridImages/wrighton.jpg images/hybridImages/bear.jpg 0.7 5.0   | bear-wrighton.jpg |
-| cargo run --release -- images/hybridImages/wrighton.jpg images/hybridImages/panda.jpg 0.55 5.0 |                   |
+| command                                                                                         | file               |
+| cargo run --release -- 8.0 0.8 file images/hybridImages/wrighton.jpg images/hybridImages/bear.jpg | bear-wrighton.jpg  |
+| cargo run --release -- images/hybridImages/wrighton.jpg images/hybridImages/panda.jpg 0.55 5.0    | panda-wrighton.jpg |
+|                                                                                                 |                    |
