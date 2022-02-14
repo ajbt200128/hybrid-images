@@ -1,10 +1,12 @@
+use fft2d::slice::fft_2d;
 use image::{
-    imageops::filter3x3, io::Reader as ImageReader, DynamicImage, GenericImage, ImageBuffer, Pixel,
-    RgbaImage,
+    imageops::filter3x3, io::Reader as ImageReader, DynamicImage, GenericImage, GenericImageView,
+    ImageBuffer, Pixel, RgbaImage, GrayImage,
 };
 use imageproc::{
     definitions::Image, drawing::draw_text_mut, filter::gaussian_blur_f32, map::map_colors2,
 };
+use rustfft::num_complex::Complex;
 use rusttype::{Font, Scale};
 
 use clap::{Parser, Subcommand};
@@ -85,20 +87,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             (img1, img2, img3)
         }
     };
+
+    create_fft(img1.clone()).save("fft_aa.jpg")?;
+    create_fft(img2.clone()).save("fft_bb.jpg")?;
     let img1 = low_pass(img1, args.a_blur.unwrap_or(4.5));
-    let img2 = high_pass(img2, args.b_blur.unwrap_or(0.545));
+    let img2 = high_pass(img2, args.b_blur.unwrap_or(0.545),args.a_blur.unwrap_or(4.5));
     img1.save("a.jpg")?;
     img2.save("b.jpg")?;
+
+    create_fft(img1.clone()).save("fft_a.jpg")?;
+    create_fft(img2.clone()).save("fft_b.jpg")?;
     let t = if let Some(img3) = img3 {
-        let img3 = high_pass(img3, args.c_blur.unwrap_or(0.0));
+
+        create_fft(img3.clone()).save("fft_cc.jpg")?;
+        let img3 = high_pass(img3, args.c_blur.unwrap_or(0.0),args.a_blur.unwrap_or(4.5));
+        create_fft(img3.clone()).save("fft_c.jpg")?;
         img3.save("c.jpg")?;
         overlay3(img1, img2, img3)
     } else {
         overlay(img1, img2)
     };
     t.save("t.jpg")?;
+    create_fft(t).save("fft_t.jpg")?;
     Ok(())
 }
+
+fn create_fft(img:DynamicImage)->GrayImage{
+    let (h,w) = (img.height(),img.width());
+    let mut buff: Vec<Complex<f64>> = img
+        .into_luma8()
+        .as_raw()
+        .iter()
+        .map(|&pix| Complex::new(pix as f64 / 255.0, 0.0))
+        .collect();
+    fft_2d(w as usize, h as usize,&mut buff);
+    view_fft_norm(w, h, &buff)
+}
+
+fn view_fft_norm(width: u32, height: u32, img_buffer: &[Complex<f64>]) -> GrayImage {
+    let fft_log_norm: Vec<f64> = img_buffer.iter().map(|c| c.norm().ln()).collect();
+    let max_norm = fft_log_norm.iter().cloned().fold(0.0, f64::max);
+    let fft_norm_u8: Vec<u8> = fft_log_norm
+        .into_iter()
+        .map(|x| ((x / max_norm) * 255.0) as u8)
+        .collect();
+    GrayImage::from_raw(width, height, fft_norm_u8).unwrap()
+}
+
 fn draw_message(
     msg: String,
     width: u32,
@@ -118,7 +153,7 @@ fn draw_message(
 
 fn clamp_sub(a: u8, b: u8, max: u8) -> u8 {
     if a < b {
-        max.min(b)
+        0
     } else {
         max.min(a - b)
     }
@@ -136,15 +171,15 @@ fn low_pass(img: DynamicImage, amt: f32) -> DynamicImage {
     DynamicImage::ImageRgba8(gaussian_blur_f32(&img.to_rgba8(), amt))
 }
 
-fn laplacian(amt:f32) -> [f32;9]{
+fn laplacian(amt: f32) -> [f32; 9] {
     let mut v = IDENTITY_MINUS_LAPLACIAN;
     v[4] *= amt;
     v
 }
 
-fn high_pass(img: DynamicImage, amt: f32) -> DynamicImage {
+fn high_pass(img: DynamicImage, amt: f32,amt2:f32) -> DynamicImage {
     let img_impulse = filter3x3(&img, &laplacian(amt));
-    let img_low = low_pass(img, amt/2.0);
+    let img_low = low_pass(img, amt2);
     let diff = map_colors2(&img_impulse, &img_low, |mut p, q| {
         p.apply2(&q, |c1, c2| clamp_sub(c1, c2, u8::MAX));
         p.0[3] = 255;
