@@ -49,7 +49,7 @@
 
     And "GOODBYE":
 
-    [[./images/results/welcome_process/bb.jpg]]
+    [[./images/results/welcome_process/aa.jpg]]
 ** Creating Low and High Pass Filters
 *** Low Pass Filter
     The simplest way to create a low pass filter for an image, is to apply a
